@@ -1,14 +1,20 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <title>FedonApp</title>
-    <link rel="manifest" href="/manifest.json">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FedonApp</title>
+  <link rel="manifest" href="/manifest.json" />
 </head>
 <body>
-    <h1>FedonApp</h1>
-    <button id="enablePush">Bildirimleri Aç</button>
+  <h1>FedonApp</h1>
+  <p id="status">Hazır</p>
+  <button id="enablePush">Bildirimleri Aç</button>
 
-    <script src="/app.js"></script>
+  <script>
+    // ÇALIŞMA ORTAMI: Cloudflare Worker URL’in
+    window.WORKER = 'https://fedonpush.fedaiustunol.workers.dev';
+  </script>
+  <script src="/app.js"></script>
 </body>
 </html>
