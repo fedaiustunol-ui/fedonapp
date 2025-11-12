@@ -15,6 +15,125 @@
     // ÇALIŞMA ORTAMI: Cloudflare Worker URL’in
     window.WORKER = 'https://fedonpush.fedaiustunol.workers.dev';
   </script>
-  <script src="/app.js"></script>
+  <script src="/app.js"></script><!-- HAYALLER (A/B Karar + Mantıksal Gerekçe) -->
+<section class="card" id="hayaller">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+    <h2 style="margin:0">HAYALLER</h2>
+    <span class="pill">A/B karar</span>
+  </div>
+  <p style="margin:6px 0 12px;color:var(--muted)">
+    İki seçeneği yaz, 3 kısa kriterle oylayıp mantıksal bir gerekçeyle öneri verelim.
+  </p>
+
+  <label>Seçenek A</label>
+  <input id="optA" type="text" maxlength="120" placeholder="Örn: Şehirde kalmak" style="width:100%;padding:12px;border-radius:12px;border:1px solid #ddd;background:var(--bg);color:var(--fg)">
+
+  <div style="height:8px"></div>
+
+  <label>Seçenek B</label>
+  <input id="optB" type="text" maxlength="120" placeholder="Örn: Ege’ye taşınmak" style="width:100%;padding:12px;border-radius:12px;border:1px solid #ddd;background:var(--bg);color:var(--fg)">
+
+  <hr style="border:none;border-top:1px solid rgba(0,0,0,.08);margin:14px 0">
+
+  <div style="display:grid;gap:10px">
+    <div class="card" style="padding:12px">
+      <div style="font-weight:600;margin-bottom:8px">Kriter 1 — Uzun vadeli değer</div>
+      <div class="row" role="group" aria-label="Kriter 1">
+        <button class="pill" data-crit="v" data-win="A">A daha iyi</button>
+        <button class="pill" data-crit="v" data-win="B">B daha iyi</button>
+        <button class="pill" data-crit="v" data-win="=">Eşit</button>
+      </div>
+    </div>
+
+    <div class="card" style="padding:12px">
+      <div style="font-weight:600;margin-bottom:8px">Kriter 2 — Risk / belirsizlik daha düşük</div>
+      <div class="row" role="group" aria-label="Kriter 2">
+        <button class="pill" data-crit="r" data-win="A">A daha iyi</button>
+        <button class="pill" data-crit="r" data-win="B">B daha iyi</button>
+        <button class="pill" data-crit="r" data-win="=">Eşit</button>
+      </div>
+    </div>
+
+    <div class="card" style="padding:12px">
+      <div style="font-weight:600;margin-bottom:8px">Kriter 3 — Başlama kolaylığı / ilk adım</div>
+      <div class="row" role="group" aria-label="Kriter 3">
+        <button class="pill" data-crit="e" data-win="A">A daha iyi</button>
+        <button class="pill" data-crit="e" data-win="B">B daha iyi</button>
+        <button class="pill" data-crit="e" data-win="=">Eşit</button>
+      </div>
+    </div>
+  </div>
+
+  <div style="height:12px"></div>
+  <button id="decide" class="cta">🤔 Fedon’a Sor</button>
+
+  <div id="result" class="card" style="display:none;margin-top:12px">
+    <div id="decision" style="font-size:18px;font-weight:700;margin-bottom:6px"></div>
+    <div id="reason" style="color:var(--muted)"></div>
+  </div>
+</section>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const optA = $('optA'), optB = $('optB'), decide = $('decide');
+  const result = $('result'), decision = $('decision'), reason = $('reason');
+
+  // Kriter seçimlerini tut
+  const picks = { v: '=', r: '=', e: '=' }; // v=değer, r=risk, e=başlama kolaylığı
+  document.querySelectorAll('#hayaller button.pill[data-crit]').forEach(btn=>{
+    btn.addEventListener('click', () => {
+      const { crit, win } = btn.dataset;
+      picks[crit] = win;
+      // seçili butonu vurgula
+      btn.parentElement.querySelectorAll('button').forEach(b=>b.style.background='var(--card)');
+      btn.style.background = 'rgba(10,132,255,.15)';
+    });
+  });
+
+  function sanitize(s){ return (s||'').trim().slice(0,120); }
+
+  decide.addEventListener('click', () => {
+    const A = sanitize(optA.value);
+    const B = sanitize(optB.value);
+    if (!A || !B) {
+      decision.textContent = 'Lütfen A ve B seçeneklerini yaz.';
+      reason.textContent = '';
+      result.style.display = 'block';
+      return;
+    }
+
+    // Puanlama (A/B): v=+2, r=+2, e=+1 ağırlık
+    const weight = { v:2, r:2, e:1 };
+    let scoreA = 0, scoreB = 0;
+    for (const k of Object.keys(picks)) {
+      if (picks[k] === 'A') scoreA += weight[k];
+      else if (picks[k] === 'B') scoreB += weight[k];
+    }
+
+    let winner = 'A'; 
+    if (scoreB > scoreA) winner = 'B';
+    else if (scoreB === scoreA) {
+      // eşitlikte kısa bağlam: hangisi daha spesifikse onu seç
+      winner = (B.length > A.length) ? 'B' : 'A';
+    }
+
+    const sel = winner === 'A' ? A : B;
+
+    // Mantıksal kısa gerekçe (seçilen kriterlere göre cümle kur)
+    const parts = [];
+    if (picks.v !== '=') parts.push((winner===picks.v ? 'uzun vadeli değeri daha yüksek' : 'uzun vadede avantajlı'));
+    if (picks.r !== '=') parts.push((winner===picks.r ? 'riski/Belirsizliği daha düşük' : 'daha öngörülebilir'));
+    if (picks.e !== '=') parts.push((winner===picks.e ? 'ilk adımı atması daha kolay' : 'başlangıç bariyeri daha düşük'));
+    const msg = parts.length ? parts.join(', ') : 'genel denge açısından daha mantıklı';
+
+    decision.textContent = `Fedon’ın cevabı: ${winner} → ${sel}`;
+    reason.textContent   = `Neden: ${msg}.`;
+
+    result.style.display = 'block';
+    try { localStorage.setItem('fedon.lastDecision', JSON.stringify({A,B,winner,when:Date.now()})); } catch {}
+  });
+})();
+</script>
 </body>
 </html>
