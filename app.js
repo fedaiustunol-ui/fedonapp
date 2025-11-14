@@ -1,34 +1,12 @@
+// FedonApp push backend adresi:
 const workerURL = "https://fedonpush.fedaiustunol.workers.dev";
 
-async function enablePush() {
-  const statusEl = document.getElementById("status");
-  statusEl.textContent = "İzin isteniyor...";
-
-  const perm = await Notification.requestPermission();
-  if (perm !== "granted") {
-    statusEl.textContent = "Bildirim izni reddedildi ❌";
-    return;
-  }
-
-  // VAPID public key'i worker'dan çek
-  const vapidRes = await fetch(`${workerURL}/vapid-public`);
-  const vapidPublic = await vapidRes.text();
-
-  const reg = await navigator.serviceWorker.register("/sw.js");
-  const sub = await reg.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(vapidPublic)
-  });
-
-  // Aboneliği Worker’a gönder
-  await fetch(`${workerURL}/subscribe`, {
-    method: "POST",
-    body: JSON.stringify(sub),
-  });
-
-  statusEl.textContent = "Push aktif! 🚀";
+function setStatus(msg) {
+  const el = document.getElementById("status");
+  if (el) el.textContent = msg;
 }
 
+// VAPID public key'i Uint8Array'e çevirme yardımcı fonksiyonu
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding)
@@ -42,4 +20,66 @@ function urlBase64ToUint8Array(base64String) {
   return outputArray;
 }
 
-document.getElementById("enablePush").onclick = enablePush;
+async function enablePush() {
+  try {
+    if (!("Notification" in window)) {
+      setStatus("Tarayıcı bildirim desteklemiyor ❌");
+      return;
+    }
+    if (!("serviceWorker" in navigator)) {
+      setStatus("Service worker desteklenmiyor ❌");
+      return;
+    }
+
+    setStatus("İzin isteniyor...");
+
+    // Bildirim izni iste
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") {
+      setStatus("Bildirim izni reddedildi ❌");
+      return;
+    }
+
+    // Worker'dan VAPID public key al
+    const res = await fetch(`${workerURL}/vapid-public`);
+    const vapidPublic = (await res.text()).trim();
+
+    if (!vapidPublic) {
+      setStatus("Sunucudan VAPID anahtarı alınamadı ❌");
+      return;
+    }
+
+    // Service worker kaydı
+    const reg = await navigator.serviceWorker.register("/sw.js", {
+      scope: "/",
+    });
+
+    // Push aboneliği oluştur
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(vapidPublic),
+    });
+
+    // Aboneliği backend'e gönder
+    await fetch(`${workerURL}/subscribe`, {
+      method: "POST",
+      body: JSON.stringify(sub),
+    });
+
+    setStatus("Push aktif! 🚀");
+  } catch (err) {
+    console.error(err);
+    setStatus("Hata: " + (err && err.message ? err.message : String(err)));
+  }
+}
+
+// Sayfa yüklendiğinde butonu bağla
+document.addEventListener("DOMContentLoaded", () => {
+  const btn = document.getElementById("enablePush");
+  if (!btn) {
+    console.error("enablePush butonu bulunamadı");
+    return;
+  }
+  btn.addEventListener("click", enablePush);
+  setStatus("Hazır");
+});
